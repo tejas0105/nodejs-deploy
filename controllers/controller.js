@@ -21,7 +21,7 @@ const finalPage = async (req, res) => {
   try {
     const urlDoc = await ShortUrl.find({ hidden: false });
     const ip = req.headers["x-forwarded-for"];
-    console.log(typeof ip);
+    console.log(ip.split(" ")[0]);
     return res.status(200).json({ data: urlDoc });
   } catch (error) {
     console.log(error?.message);
