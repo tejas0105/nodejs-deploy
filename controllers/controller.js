@@ -20,7 +20,8 @@ const getAllData = async (req, res) => {
 const finalPage = async (req, res) => {
   try {
     const urlDoc = await ShortUrl.find({ hidden: false });
-    console.log(req.headers["x-forwarded-for"]);
+    const ip = req.headers["x-forwarded-for"];
+    console.log(ip[0]);
     return res.status(200).json({ data: urlDoc });
   } catch (error) {
     console.log(error?.message);
