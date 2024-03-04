@@ -20,7 +20,7 @@ const getAllData = async (req, res) => {
 const finalPage = async (req, res) => {
   try {
     const urlDoc = await ShortUrl.find({ hidden: false });
-    console.log(req.ip.split("ffff")[1].split(":")[1]);
+    console.log(req.ip);
     return res.status(200).json({ data: urlDoc });
   } catch (error) {
     console.log(error?.message);
