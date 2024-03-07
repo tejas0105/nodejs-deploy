@@ -33,7 +33,6 @@ const urlSchema = new mongoose.Schema(
     thumbnail: {
       type: String,
     },
-    userDetails: [userDataSchema],
     visitHistory: [{ timeStamp: { type: String } }],
     hidden: {
       type: Boolean,
