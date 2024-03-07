@@ -1,7 +1,8 @@
-import ShortUrl from "../models/models.js";
+import ShortUrl from "../models/linkModel.js";
+import User from "../models/userModel.js";
 import { nanoid } from "nanoid";
 import axios from "axios";
-// import ip from "ip";
+import node_geocoder from "node-geocoder";
 
 const home = async (req, res) => {
   res.send("<h1>This is the home route</h1>");
@@ -20,11 +21,102 @@ const getAllData = async (req, res) => {
 const finalPage = async (req, res) => {
   try {
     const urlDoc = await ShortUrl.find({ hidden: false });
-    const ip = req.headers["x-forwarded-for"];
-    console.log(ip.split(" ")[0].split(",")[0]);
+    // const ip = req.headers["x-forwarded-for"];
+    // console.log(ip.split(" ")[0].split(",")[0]);
+    // console.log(ip);
     return res.status(200).json({ data: urlDoc });
   } catch (error) {
     console.log(error?.message);
+  }
+};
+
+const getcoords = async (req, res) => {
+  try {
+    const geocoder = node_geocoder({
+      provider: "opencage",
+      apiKey: process.env.OPENCAGE_API_KEY,
+    });
+    const body = req.body;
+    // console.log(body.ip.ip);
+    const locationData = await geocoder.geocode(`${body.lat}, ${body.long}`);
+
+    const existingDoc = await User.findOne({
+      zipcode: locationData?.[0]?.zipcode,
+    });
+
+    if (existingDoc) {
+      await User.findOneAndUpdate(
+        { zipcode: existingDoc?.zipcode },
+        {
+          clicks: ++existingDoc.clicks,
+        }
+      );
+      // console.log(
+      //   existingDoc?.publicIp.find((v) => {
+      //     return v === body.ip.ip;
+      //   })
+      // );
+      if (!existingDoc?.publicIp?.find((v) => v === body.ip.ip)) {
+        await User.findOneAndUpdate(
+          { zipcode: existingDoc?.zipcode },
+          {
+            $push: {
+              publicIp: body.ip.ip,
+            },
+            // clicks: ++existingDoc.clicks,
+          }
+        );
+      }
+      return res.status(200).json({ message: "Updated" });
+    } else {
+      await User.create({
+        zipcode: locationData?.[0]?.zipcode,
+        location: `${locationData?.[0]?.streetName}, ${locationData?.[0]?.city}, ${locationData?.[0]?.county}, ${locationData?.[0]?.state}, ${locationData?.[0]?.country}`,
+        publicIp: body.ip.ip,
+        clicks: 1,
+      });
+      // console.log({ id: userDoc._id, clicks: userDoc.clicks });
+
+      return res.status(201).json({ message: "Done" });
+    }
+  } catch (error) {
+    console.log(error);
+  }
+};
+
+const handleNullLocation = async (req, res) => {
+  try {
+    const existingDoc = await User.findOne({ zipcode: null });
+    const body = req.body;
+    // console.log(body?.ip);
+    if (!existingDoc) {
+      await User.create({ publicIp: req.body?.ip, clicks: 1 });
+      res.json({ message: "created but locaiton not allowed" });
+    } else {
+      const userDoc = await User.findOne({ zipcode: null });
+      // console.log(userDoc);
+      if (!existingDoc?.publicIp?.find((v) => v === body?.ip)) {
+        await User.findOneAndUpdate(
+          { zipcode: existingDoc?.zipcode },
+          {
+            $push: {
+              publicIp: body?.ip,
+            },
+            // clicks: ++existingDoc.clicks,
+          }
+        );
+      }
+      await User.findOneAndUpdate(
+        { zipcode: userDoc.zipcode },
+        {
+          clicks: ++userDoc.clicks,
+        }
+      );
+
+      res.json({ message: "Updated but locaiton not allowed" });
+    }
+  } catch (error) {
+    console.log(error.message);
   }
 };
 
@@ -132,4 +224,6 @@ export {
   getAllData,
   updateDoc,
   finalPage,
+  getcoords,
+  handleNullLocation,
 };

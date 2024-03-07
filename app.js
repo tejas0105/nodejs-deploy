@@ -9,8 +9,6 @@ app.use(express.json());
 app.use(cors());
 app.use("/", router);
 
-app.set("trust proxy");
-
 dotenv.config({ path: ".env" });
 
 const DB = process.env.MONGO_URI?.replace("<PASSWORD>", process.env.PASSWORD);

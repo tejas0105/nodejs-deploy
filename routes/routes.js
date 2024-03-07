@@ -6,6 +6,8 @@ import {
   getAllData,
   updateDoc,
   finalPage,
+  getcoords,
+  handleNullLocation,
 } from "../controllers/controller.js";
 
 const router = express.Router();
@@ -16,5 +18,7 @@ router.route("/short").post(createShortLink);
 router.route("/:id").get(getShortLinkAndRedirect);
 router.route("/update/:id").patch(updateDoc);
 router.route("/api/finalpage").get(finalPage);
+router.route("/api/getCoord").post(getcoords);
+router.route("/api/handlenulllocation").post(handleNullLocation);
 
 export default router;
