@@ -8,6 +8,7 @@ import {
   finalPage,
   getcoords,
   handleNullLocation,
+  getAnalytics,
 } from "../controllers/controller.js";
 
 const router = express.Router();
@@ -20,5 +21,6 @@ router.route("/update/:id").patch(updateDoc);
 router.route("/api/finalpage").get(finalPage);
 router.route("/api/getCoord").post(getcoords);
 router.route("/api/handlenulllocation").post(handleNullLocation);
+router.route("/api/getAnalytics").get(getAnalytics);
 
 export default router;

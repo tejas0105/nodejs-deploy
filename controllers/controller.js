@@ -3,6 +3,7 @@ import User from "../models/userModel.js";
 import { nanoid } from "nanoid";
 import axios from "axios";
 import node_geocoder from "node-geocoder";
+import { loadContext } from "netlify-lambda/lib/config.js";
 
 const home = async (req, res) => {
   res.send("<h1>This is the home route</h1>");
@@ -21,6 +22,8 @@ const getAllData = async (req, res) => {
 const finalPage = async (req, res) => {
   try {
     const urlDoc = await ShortUrl.find({ hidden: false });
+    // const referralSource = req.get("Referrer") || "Direct";
+    // console.log(referralSource);
     // const ip = req.headers["x-forwarded-for"];
     // console.log(ip.split(" ")[0].split(",")[0]);
     // console.log(ip);
@@ -44,19 +47,49 @@ const getcoords = async (req, res) => {
       zipcode: locationData?.[0]?.zipcode,
     });
 
+    let currentDate = new Date();
+
+    let year = currentDate.getFullYear();
+    let month = (currentDate.getMonth() + 1).toString().padStart(2, "0");
+    let day = currentDate.getDate().toString().padStart(2, "0");
+
+    let formattedDate = year + "-" + month + "-" + day;
+
     if (existingDoc) {
-      await User.findOneAndUpdate(
-        { zipcode: existingDoc?.zipcode },
-        {
-          clicks: ++existingDoc.clicks,
-        }
-      );
-      // console.log(
-      //   existingDoc?.publicIp.find((v) => {
-      //     return v === body.ip.ip;
-      //   })
-      // );
+      if (
+        existingDoc?.clicks?.find((v) => v?.date === formattedDate)
+        // existingDoc.clicks[existingDoc.clicks.length - 1].date === formattedDate
+      ) {
+        await User.findOneAndUpdate(
+          {
+            "clicks._id":
+              existingDoc?.clicks?.[existingDoc?.clicks.length - 1]?._id,
+            "clicks.date": formattedDate,
+          },
+          {
+            $inc: {
+              "clicks.$.clicks": 1,
+            },
+          }
+        );
+      } else {
+        await User.findOneAndUpdate(
+          {
+            zipcode: existingDoc?.zipcode,
+          },
+          {
+            $push: {
+              clicks: { clicks: 1, date: formattedDate },
+            },
+          }
+        );
+      }
       if (!existingDoc?.publicIp?.find((v) => v === body.ip.ip)) {
+        // console.log(
+        //   existingDoc?.publicIp.find((v) => {
+        //     return v === body.ip.ip;
+        //   })
+        // );
         await User.findOneAndUpdate(
           { zipcode: existingDoc?.zipcode },
           {
@@ -64,7 +97,8 @@ const getcoords = async (req, res) => {
               publicIp: body.ip.ip,
             },
             // clicks: ++existingDoc.clicks,
-          }
+          },
+          { new: true }
         );
       }
       return res.status(200).json({ message: "Updated" });
@@ -73,7 +107,10 @@ const getcoords = async (req, res) => {
         zipcode: locationData?.[0]?.zipcode,
         location: `${locationData?.[0]?.streetName}, ${locationData?.[0]?.city}, ${locationData?.[0]?.county}, ${locationData?.[0]?.state}, ${locationData?.[0]?.country}`,
         publicIp: body.ip.ip,
-        clicks: 1,
+        clicks: {
+          clicks: 1,
+          date: formattedDate,
+        },
       });
       // console.log({ id: userDoc._id, clicks: userDoc.clicks });
 
@@ -89,9 +126,23 @@ const handleNullLocation = async (req, res) => {
     const existingDoc = await User.findOne({ zipcode: null });
     const body = req.body;
     // console.log(body?.ip);
+
+    let currentDate = new Date();
+
+    let year = currentDate.getFullYear();
+    let month = (currentDate.getMonth() + 1).toString().padStart(2, "0");
+    let day = currentDate.getDate().toString().padStart(2, "0");
+
+    let formattedDate = year + "-" + month + "-" + day;
     if (!existingDoc) {
-      await User.create({ publicIp: req.body?.ip, clicks: 1 });
-      res.json({ message: "created but locaiton not allowed" });
+      await User.create({
+        publicIp: req.body?.ip,
+        clicks: {
+          clicks: 1,
+          date: formattedDate,
+        },
+      });
+      res.json({ message: "created but location not allowed" });
     } else {
       const userDoc = await User.findOne({ zipcode: null });
       // console.log(userDoc);
@@ -107,9 +158,15 @@ const handleNullLocation = async (req, res) => {
         );
       }
       await User.findOneAndUpdate(
-        { zipcode: userDoc.zipcode },
         {
-          clicks: ++userDoc.clicks,
+          "clicks._id":
+            existingDoc?.clicks?.[existingDoc?.clicks.length - 1]?._id,
+          "clicks.date": formattedDate,
+        },
+        {
+          $inc: {
+            "clicks.$.clicks": 1,
+          },
         }
       );
 
@@ -199,6 +256,11 @@ const getShortLinkAndRedirect = async (req, res) => {
   }
 };
 
+const getAnalytics = async (req, res) => {
+  const clickData = await User.findOne({ zipcode: "400705" });
+  res.json({ clickData });
+};
+
 const updateDoc = async (req, res) => {
   try {
     const id = req.params.id;
@@ -226,4 +288,5 @@ export {
   finalPage,
   getcoords,
   handleNullLocation,
+  getAnalytics,
 };
