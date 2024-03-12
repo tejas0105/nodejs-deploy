@@ -3,7 +3,6 @@ import User from "../models/userModel.js";
 import { nanoid } from "nanoid";
 import axios from "axios";
 import node_geocoder from "node-geocoder";
-import { loadContext } from "netlify-lambda/lib/config.js";
 
 const home = async (req, res) => {
   res.send("<h1>This is the home route</h1>");
@@ -126,7 +125,7 @@ const handleNullLocation = async (req, res) => {
     const existingDoc = await User.findOne({ zipcode: null });
     const body = req.body;
     // console.log(body?.ip);
-
+    console.log(existingDoc);
     let currentDate = new Date();
 
     let year = currentDate.getFullYear();
@@ -142,9 +141,9 @@ const handleNullLocation = async (req, res) => {
           date: formattedDate,
         },
       });
+
       res.json({ message: "created but location not allowed" });
     } else {
-      const userDoc = await User.findOne({ zipcode: null });
       // console.log(userDoc);
       if (!existingDoc?.publicIp?.find((v) => v === body?.ip)) {
         await User.findOneAndUpdate(
@@ -156,19 +155,32 @@ const handleNullLocation = async (req, res) => {
             // clicks: ++existingDoc.clicks,
           }
         );
-      }
-      await User.findOneAndUpdate(
-        {
-          "clicks._id":
-            existingDoc?.clicks?.[existingDoc?.clicks.length - 1]?._id,
-          "clicks.date": formattedDate,
-        },
-        {
-          $inc: {
-            "clicks.$.clicks": 1,
+      } else if (existingDoc?.clicks?.find((v) => v?.date === formattedDate)) {
+        console.log("null");
+        await User.findOneAndUpdate(
+          {
+            "clicks._id":
+              existingDoc?.clicks?.[existingDoc?.clicks.length - 1]?._id,
+            "clicks.date": formattedDate,
           },
-        }
-      );
+          {
+            $inc: {
+              "clicks.$.clicks": 1,
+            },
+          }
+        );
+      } else {
+        await User.findOneAndUpdate(
+          {
+            zipcode: existingDoc?.zipcode,
+          },
+          {
+            $push: {
+              clicks: { clicks: 1, date: formattedDate },
+            },
+          }
+        );
+      }
 
       res.json({ message: "Updated but locaiton not allowed" });
     }
