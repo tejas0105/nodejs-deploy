@@ -21,6 +21,7 @@ const getAllData = async (req, res) => {
 const finalPage = async (req, res) => {
   try {
     const urlDoc = await ShortUrl.find({ hidden: false });
+    console.log(req);
     // const referralSource = req.get("Referrer") || "Direct";
     // console.log(referralSource);
     // const ip = req.headers["x-forwarded-for"];
