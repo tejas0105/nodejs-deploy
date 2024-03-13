@@ -21,7 +21,6 @@ const getAllData = async (req, res) => {
 const finalPage = async (req, res) => {
   try {
     const urlDoc = await ShortUrl.find({ hidden: false });
-    console.log(req);
     // const referralSource = req.get("Referrer") || "Direct";
     // console.log(referralSource);
     // const ip = req.headers["x-forwarded-for"];
@@ -35,160 +34,215 @@ const finalPage = async (req, res) => {
 
 const getcoords = async (req, res) => {
   try {
+    // const geocoder = node_geocoder({
+    //   provider: "opencage",
+    //   apiKey: process.env.OPENCAGE_API_KEY,
+    // });
+    // const body = req.body;
+    // // console.log(body.ip.ip);
+    // const locationData = await geocoder.geocode(`${body.lat}, ${body.long}`);
+
+    // const existingDoc = await User.findOne({
+    //   zipcode: locationData?.[0]?.zipcode,
+    // });
+
+    // let currentDate = new Date();
+
+    // let year = currentDate.getFullYear();
+    // let month = (currentDate.getMonth() + 1).toString().padStart(2, "0");
+    // let day = currentDate.getDate().toString().padStart(2, "0");
+
+    // let formattedDate = year + "-" + month + "-" + day;
+
+    // if (existingDoc) {
+    //   if (
+    //     existingDoc?.clicks?.find((v) => v?.date === formattedDate)
+    //     // existingDoc.clicks[existingDoc.clicks.length - 1].date === formattedDate
+    //   ) {
+    //     await User.findOneAndUpdate(
+    //       {
+    //         "clicks._id":
+    //           existingDoc?.clicks?.[existingDoc?.clicks.length - 1]?._id,
+    //         "clicks.date": formattedDate,
+    //       },
+    //       {
+    //         $inc: {
+    //           "clicks.$.clicks": 1,
+    //         },
+    //       }
+    //     );
+    //   } else {
+    //     await User.findOneAndUpdate(
+    //       {
+    //         zipcode: existingDoc?.zipcode,
+    //       },
+    //       {
+    //         $push: {
+    //           clicks: { clicks: 1, date: formattedDate },
+    //         },
+    //       }
+    //     );
+    //   }
+    //   if (!existingDoc?.publicIp?.find((v) => v === body.ip.ip)) {
+    //     // console.log(
+    //     //   existingDoc?.publicIp.find((v) => {
+    //     //     return v === body.ip.ip;
+    //     //   })
+    //     // );
+    //     await User.findOneAndUpdate(
+    //       { zipcode: existingDoc?.zipcode },
+    //       {
+    //         $push: {
+    //           publicIp: body.ip.ip,
+    //         },
+    //         // clicks: ++existingDoc.clicks,
+    //       },
+    //       { new: true }
+    //     );
+    //   }
+    //   return res.status(200).json({ message: "Updated" });
+    // } else {
+    //   await User.create({
+    //     zipcode: locationData?.[0]?.zipcode,
+    //     location: `${locationData?.[0]?.streetName}, ${locationData?.[0]?.city}, ${locationData?.[0]?.county}, ${locationData?.[0]?.state}, ${locationData?.[0]?.country}`,
+    //     publicIp: body.ip.ip,
+    //     clicks: {
+    //       clicks: 1,
+    //       date: formattedDate,
+    //     },
+    //   });
+    //   // console.log({ id: userDoc._id, clicks: userDoc.clicks });
     const geocoder = node_geocoder({
       provider: "opencage",
       apiKey: process.env.OPENCAGE_API_KEY,
     });
-    const body = req.body;
-    // console.log(body.ip.ip);
-    const locationData = await geocoder.geocode(`${body.lat}, ${body.long}`);
+    const coordinates = {
+      lat: Number(req.body.lat.toFixed(3)),
+      long: Number(req.body.long.toFixed(3)),
+    };
+    const locationData = await geocoder.geocode(
+      `${coordinates.lat}, ${coordinates.long}`
+    );
 
     const existingDoc = await User.findOne({
-      zipcode: locationData?.[0]?.zipcode,
+      coordinates: { lat: coordinates.lat, long: coordinates.long },
     });
-
-    let currentDate = new Date();
-
-    let year = currentDate.getFullYear();
-    let month = (currentDate.getMonth() + 1).toString().padStart(2, "0");
-    let day = currentDate.getDate().toString().padStart(2, "0");
-
-    let formattedDate = year + "-" + month + "-" + day;
-
-    if (existingDoc) {
-      if (
-        existingDoc?.clicks?.find((v) => v?.date === formattedDate)
-        // existingDoc.clicks[existingDoc.clicks.length - 1].date === formattedDate
-      ) {
-        await User.findOneAndUpdate(
-          {
-            "clicks._id":
-              existingDoc?.clicks?.[existingDoc?.clicks.length - 1]?._id,
-            "clicks.date": formattedDate,
-          },
-          {
-            $inc: {
-              "clicks.$.clicks": 1,
-            },
-          }
-        );
-      } else {
-        await User.findOneAndUpdate(
-          {
-            zipcode: existingDoc?.zipcode,
-          },
-          {
-            $push: {
-              clicks: { clicks: 1, date: formattedDate },
-            },
-          }
-        );
-      }
-      if (!existingDoc?.publicIp?.find((v) => v === body.ip.ip)) {
-        // console.log(
-        //   existingDoc?.publicIp.find((v) => {
-        //     return v === body.ip.ip;
-        //   })
-        // );
-        await User.findOneAndUpdate(
-          { zipcode: existingDoc?.zipcode },
-          {
-            $push: {
-              publicIp: body.ip.ip,
-            },
-            // clicks: ++existingDoc.clicks,
-          },
-          { new: true }
-        );
-      }
-      return res.status(200).json({ message: "Updated" });
-    } else {
-      await User.create({
-        zipcode: locationData?.[0]?.zipcode,
-        location: `${locationData?.[0]?.streetName}, ${locationData?.[0]?.city}, ${locationData?.[0]?.county}, ${locationData?.[0]?.state}, ${locationData?.[0]?.country}`,
-        publicIp: body.ip.ip,
-        clicks: {
-          clicks: 1,
-          date: formattedDate,
+    if (
+      existingDoc?.coordinates.lat === coordinates.lat && // if coordinates are same then just update the views
+      existingDoc?.coordinates.long === coordinates.long
+    ) {
+      // if (!existingDoc?.publicIP.find((v) => v.ip === req.body.ip.ip)) {
+      //   console.log("hello");
+      //   await User.findOneAndUpdate(
+      //     {
+      //       coordinates: { lat: coordinates.lat, long: coordinates.long },
+      //     },
+      //     {
+      //       $push: { publicIP: { ip: req.body.ip.ip, timeStamp: Date.now() } },
+      //     }
+      //   );
+      // }
+      await User.findOneAndUpdate(
+        {
+          coordinates: { lat: coordinates.lat, long: coordinates.long },
         },
+        {
+          $push: {
+            views: { timeStamp: Date.now() },
+            publicIP: { ip: req.body.ip.ip, timeStamp: Date.now() },
+            deviceType: { type: req.body.deviceType, timeStamp: Date.now() },
+          },
+        }
+      );
+      return res.json({ message: "updated" });
+    } else {
+      const result = await User.create({
+        coordinates: {
+          lat: coordinates.lat,
+          long: coordinates.long,
+        },
+        views: { timeStamp: Date.now() },
+        publicIP: { ip: req.body.ip.ip, timeStamp: Date.now() },
+        deviceType: { type: req.body.deviceType, timeStamp: Date.now() },
       });
-      // console.log({ id: userDoc._id, clicks: userDoc.clicks });
-
-      return res.status(201).json({ message: "Done" });
+      console.log(result);
     }
+    // const existingDoc = await User.find({coordinates: coordinates});
+
+    return res.status(201).json({ message: "Done" });
   } catch (error) {
     console.log(error);
   }
 };
 
-const handleNullLocation = async (req, res) => {
-  try {
-    const existingDoc = await User.findOne({ zipcode: null });
-    const body = req.body;
-    // console.log(body?.ip);
-    console.log(existingDoc);
-    let currentDate = new Date();
+// const handleNullLocation = async (req, res) => {
+//   try {
+//     const existingDoc = await User.findOne({ zipcode: null });
+//     const body = req.body;
+//     // console.log(body?.ip);
+//     console.log(existingDoc);
+//     let currentDate = new Date();
 
-    let year = currentDate.getFullYear();
-    let month = (currentDate.getMonth() + 1).toString().padStart(2, "0");
-    let day = currentDate.getDate().toString().padStart(2, "0");
+//     let year = currentDate.getFullYear();
+//     let month = (currentDate.getMonth() + 1).toString().padStart(2, "0");
+//     let day = currentDate.getDate().toString().padStart(2, "0");
 
-    let formattedDate = year + "-" + month + "-" + day;
-    if (!existingDoc) {
-      await User.create({
-        publicIp: req.body?.ip,
-        clicks: {
-          clicks: 1,
-          date: formattedDate,
-        },
-      });
+//     let formattedDate = year + "-" + month + "-" + day;
+//     if (!existingDoc) {
+//       await User.create({
+//         publicIp: req.body?.ip,
+//         clicks: {
+//           clicks: 1,
+//           date: formattedDate,
+//         },
+//       });
 
-      res.json({ message: "created but location not allowed" });
-    } else {
-      // console.log(userDoc);
-      if (!existingDoc?.publicIp?.find((v) => v === body?.ip)) {
-        await User.findOneAndUpdate(
-          { zipcode: existingDoc?.zipcode },
-          {
-            $push: {
-              publicIp: body?.ip,
-            },
-            // clicks: ++existingDoc.clicks,
-          }
-        );
-      } else if (existingDoc?.clicks?.find((v) => v?.date === formattedDate)) {
-        console.log("null");
-        await User.findOneAndUpdate(
-          {
-            "clicks._id":
-              existingDoc?.clicks?.[existingDoc?.clicks.length - 1]?._id,
-            "clicks.date": formattedDate,
-          },
-          {
-            $inc: {
-              "clicks.$.clicks": 1,
-            },
-          }
-        );
-      } else {
-        await User.findOneAndUpdate(
-          {
-            zipcode: existingDoc?.zipcode,
-          },
-          {
-            $push: {
-              clicks: { clicks: 1, date: formattedDate },
-            },
-          }
-        );
-      }
+//       res.json({ message: "created but location not allowed" });
+//     } else {
+//       // console.log(userDoc);
+//       if (!existingDoc?.publicIp?.find((v) => v === body?.ip)) {
+//         await User.findOneAndUpdate(
+//           { zipcode: existingDoc?.zipcode },
+//           {
+//             $push: {
+//               publicIp: body?.ip,
+//             },
+//             // clicks: ++existingDoc.clicks,
+//           }
+//         );
+//       } else if (existingDoc?.clicks?.find((v) => v?.date === formattedDate)) {
+//         console.log("null");
+//         await User.findOneAndUpdate(
+//           {
+//             "clicks._id":
+//               existingDoc?.clicks?.[existingDoc?.clicks.length - 1]?._id,
+//             "clicks.date": formattedDate,
+//           },
+//           {
+//             $inc: {
+//               "clicks.$.clicks": 1,
+//             },
+//           }
+//         );
+//       } else {
+//         await User.findOneAndUpdate(
+//           {
+//             zipcode: existingDoc?.zipcode,
+//           },
+//           {
+//             $push: {
+//               clicks: { clicks: 1, date: formattedDate },
+//             },
+//           }
+//         );
+//       }
 
-      res.json({ message: "Updated but locaiton not allowed" });
-    }
-  } catch (error) {
-    console.log(error.message);
-  }
-};
+//       res.json({ message: "Updated but locaiton not allowed" });
+//     }
+//   } catch (error) {
+//     console.log(error.message);
+//   }
+// };
 
 const createShortLink = async (req, res) => {
   try {
@@ -270,8 +324,29 @@ const getShortLinkAndRedirect = async (req, res) => {
 };
 
 const getAnalytics = async (req, res) => {
-  const clickData = await User.findOne({ zipcode: "400705" });
-  res.json({ clickData });
+  try {
+    const userDoc = await User.find();
+    // console.log(userDoc);
+    const result = await User.aggregate([
+      // { $match: { _id: userDoc[0]._id } },
+      { $unwind: "$clicks" },
+      {
+        $group: {
+          _id: "$clicks.date",
+          totalClicks: { $sum: "$clicks.clicks" },
+        },
+      },
+    ]);
+    const lifeTimeClicks = result.reduce((acc, curr) => {
+      return acc + curr.totalClicks;
+    }, 0);
+    const deviceType = req.useragent.isMobile ? "Mobile" : "Desktop";
+
+    res.json({ lifeTimeClicks: lifeTimeClicks, deviceType: deviceType });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
 };
 
 const updateDoc = async (req, res) => {
@@ -300,6 +375,6 @@ export {
   updateDoc,
   finalPage,
   getcoords,
-  handleNullLocation,
+  // handleNullLocatiosn,
   getAnalytics,
 };

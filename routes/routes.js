@@ -7,7 +7,7 @@ import {
   updateDoc,
   finalPage,
   getcoords,
-  handleNullLocation,
+  // handleNullLocation,
   getAnalytics,
 } from "../controllers/controller.js";
 
@@ -20,7 +20,7 @@ router.route("/:id").get(getShortLinkAndRedirect);
 router.route("/update/:id").patch(updateDoc);
 router.route("/api/finalpage").get(finalPage);
 router.route("/api/getCoord").post(getcoords);
-router.route("/api/handlenulllocation").post(handleNullLocation);
+// router.route("/api/handlenulllocation").post(handleNullLocation);
 router.route("/api/getAnalytics").get(getAnalytics);
 
 export default router;
