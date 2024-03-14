@@ -28,22 +28,22 @@ import mongoose from "mongoose";
 // );
 
 const userSchema = mongoose.Schema({
-  views: [{ timeStamp: { type: String } }],
+  views: [{ date: { type: Date } }],
   publicIP: [
     {
       ip: { type: String },
-      timeStamp: { type: String },
+      date: { type: Date },
     },
   ],
   deviceType: [
     {
       type: { type: String },
-      timeStamp: { type: String },
+      date: { type: Date },
     },
   ],
   coordinates: {
-    lat: Number,
-    long: Number,
+    lat: { type: Number, default: null },
+    long: { type: Number, default: null },
   },
 });
 

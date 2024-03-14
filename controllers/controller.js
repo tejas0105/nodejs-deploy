@@ -148,9 +148,9 @@ const getcoords = async (req, res) => {
         },
         {
           $push: {
-            views: { timeStamp: Date.now() },
-            publicIP: { ip: req.body.ip.ip, timeStamp: Date.now() },
-            deviceType: { type: req.body.deviceType, timeStamp: Date.now() },
+            views: { date: Date.now() },
+            publicIP: { ip: req.body.ip.ip, date: Date.now() },
+            deviceType: { type: req.body.deviceType, date: Date.now() },
           },
         }
       );
@@ -161,11 +161,11 @@ const getcoords = async (req, res) => {
           lat: coordinates.lat,
           long: coordinates.long,
         },
-        views: { timeStamp: Date.now() },
-        publicIP: { ip: req.body.ip.ip, timeStamp: Date.now() },
-        deviceType: { type: req.body.deviceType, timeStamp: Date.now() },
+        views: { date: Date.now() },
+        publicIP: { ip: req.body.ip.ip, date: Date.now() },
+        deviceType: { type: req.body.deviceType, date: Date.now() },
       });
-      console.log(result);
+      // console.log(result);
     }
     // const existingDoc = await User.find({coordinates: coordinates});
 
@@ -175,74 +175,49 @@ const getcoords = async (req, res) => {
   }
 };
 
-// const handleNullLocation = async (req, res) => {
-//   try {
-//     const existingDoc = await User.findOne({ zipcode: null });
-//     const body = req.body;
-//     // console.log(body?.ip);
-//     console.log(existingDoc);
-//     let currentDate = new Date();
+const handleNullLocation = async (req, res) => {
+  try {
+    const coordinates = {
+      lat: req.body.lat,
+      long: req.body.long,
+    };
+    const existingDoc = await User.findOne({
+      coordinates: { lat: null, long: null },
+    });
 
-//     let year = currentDate.getFullYear();
-//     let month = (currentDate.getMonth() + 1).toString().padStart(2, "0");
-//     let day = currentDate.getDate().toString().padStart(2, "0");
-
-//     let formattedDate = year + "-" + month + "-" + day;
-//     if (!existingDoc) {
-//       await User.create({
-//         publicIp: req.body?.ip,
-//         clicks: {
-//           clicks: 1,
-//           date: formattedDate,
-//         },
-//       });
-
-//       res.json({ message: "created but location not allowed" });
-//     } else {
-//       // console.log(userDoc);
-//       if (!existingDoc?.publicIp?.find((v) => v === body?.ip)) {
-//         await User.findOneAndUpdate(
-//           { zipcode: existingDoc?.zipcode },
-//           {
-//             $push: {
-//               publicIp: body?.ip,
-//             },
-//             // clicks: ++existingDoc.clicks,
-//           }
-//         );
-//       } else if (existingDoc?.clicks?.find((v) => v?.date === formattedDate)) {
-//         console.log("null");
-//         await User.findOneAndUpdate(
-//           {
-//             "clicks._id":
-//               existingDoc?.clicks?.[existingDoc?.clicks.length - 1]?._id,
-//             "clicks.date": formattedDate,
-//           },
-//           {
-//             $inc: {
-//               "clicks.$.clicks": 1,
-//             },
-//           }
-//         );
-//       } else {
-//         await User.findOneAndUpdate(
-//           {
-//             zipcode: existingDoc?.zipcode,
-//           },
-//           {
-//             $push: {
-//               clicks: { clicks: 1, date: formattedDate },
-//             },
-//           }
-//         );
-//       }
-
-//       res.json({ message: "Updated but locaiton not allowed" });
-//     }
-//   } catch (error) {
-//     console.log(error.message);
-//   }
-// };
+    if (
+      existingDoc?.coordinates.lat === coordinates.lat &&
+      existingDoc?.coordinates.long === coordinates.long
+    ) {
+      await User.findOneAndUpdate(
+        {
+          coordinates: { lat: coordinates.lat, long: coordinates.long },
+        },
+        {
+          $push: {
+            views: { date: Date.now() },
+            publicIP: { ip: req.body.ip.ip, date: Date.now() },
+            deviceType: { type: req.body.deviceType, date: Date.now() },
+          },
+        }
+      );
+      return res.json({ message: "updated but locaiton not allowed" });
+    } else {
+      const result = await User.create({
+        coordinates: {
+          lat: coordinates.lat,
+          long: coordinates.long,
+        },
+        views: { date: Date.now() },
+        publicIP: { ip: req.body.ip.ip, date: Date.now() },
+        deviceType: { type: req.body.deviceType, date: Date.now() },
+      });
+    }
+    res.json({ message: "Updated but locaiton not allowed" });
+  } catch (error) {
+    console.log(error.message);
+  }
+};
 
 const createShortLink = async (req, res) => {
   try {
@@ -325,24 +300,75 @@ const getShortLinkAndRedirect = async (req, res) => {
 
 const getAnalytics = async (req, res) => {
   try {
-    const userDoc = await User.find();
-    // console.log(userDoc);
+    const startDate = new Date("2024-03-15");
+    const endDate = new Date("2024-03-17");
+
+    // views in given date range
+    // const result = await User.aggregate([
+    //   {
+    //     $unwind: "$views",
+    //   },
+    //   {
+    //     $match: {
+    //       "views.date": {
+    //         $gte: startDate,
+    //         $lte: endDate,
+    //       },
+    //     },
+    //   },
+    //   {
+    //     $group: {
+    //       _id: null,
+    //       totalViews: { $sum: 1 },
+    //     },
+    //   },
+    // ]);
+
+    // give views for each date
+    // const result = await User.aggregate([
+    //   { $unwind: "$views" },
+    //   {
+    //     $group: {
+    //       _id: { $dateToString: { format: "%Y-%m-%d", date: "$views.date" } },
+    //       viewCount: { $sum: 1 },
+    //     },
+    //   },
+    // ]);
+
+    // count of unique ips
+    // const result = await User.aggregate([
+    //   { $unwind: "$publicIP" },
+    //   {
+    //     $group: {
+    //       _id: "$publicIP.ip",
+    //       count: { $sum: 1 },
+    //     },
+    //   },
+    // ]);
+
+    // count of each device type
     const result = await User.aggregate([
-      // { $match: { _id: userDoc[0]._id } },
-      { $unwind: "$clicks" },
+      { $unwind: "$deviceType" },
       {
         $group: {
-          _id: "$clicks.date",
-          totalClicks: { $sum: "$clicks.clicks" },
+          _id: "$deviceType.type",
+          count: { $sum: 1 },
         },
       },
     ]);
-    const lifeTimeClicks = result.reduce((acc, curr) => {
-      return acc + curr.totalClicks;
-    }, 0);
-    const deviceType = req.useragent.isMobile ? "Mobile" : "Desktop";
 
-    res.json({ lifeTimeClicks: lifeTimeClicks, deviceType: deviceType });
+    // calculate average cooridnates
+    // const result = await User.aggregate([
+    //   {
+    //     $group: {
+    //       _id: null,
+    //       avgLat: { $avg: "$coordinates.lat" },
+    //       avgLong: { $avg: "$coordinates.long" },
+    //     },
+    //   },
+    // ]);
+
+    res.json(result);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Internal Server Error" });
@@ -375,6 +401,6 @@ export {
   updateDoc,
   finalPage,
   getcoords,
-  // handleNullLocatiosn,
+  handleNullLocation,
   getAnalytics,
 };
