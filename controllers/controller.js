@@ -307,7 +307,7 @@ const getShareLink = async (req, res) => {
   const urlDoc = await ShortUrl.find({ shortId: params });
   return res.status(200).json({
     status: "success",
-    message: `http://localhost:3000?linkId=${urlDoc?.[0]?.shortId}`,
+    message: `https://storied-platypus-2e4a87.netlify.app?linkId=${urlDoc?.[0]?.shortId}`,
   });
 };
 
@@ -316,7 +316,9 @@ const redirectShareLink = async (req, res) => {
   const urlDoc = await ShortUrl.find({ shortId: params });
   return res
     .status(302)
-    .redirect(`http://localhost:3000?linkId=${urlDoc?.[0]?.shortId}`);
+    .redirect(
+      `https://storied-platypus-2e4a87.netlify.app?linkId=${urlDoc?.[0]?.shortId}`
+    );
 };
 
 const updateView = async (req, res) => {
