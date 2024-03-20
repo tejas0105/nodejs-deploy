@@ -35,7 +35,13 @@ const urlSchema = new mongoose.Schema(
     },
     visitHistory: [
       {
-        timeStamp: { type: String },
+        date: { type: Date },
+        publicIP: [
+          {
+            ip: { type: String },
+            date: { type: Date },
+          },
+        ],
         coordinates: { lat: { type: Number }, long: { type: Number } },
       },
     ],

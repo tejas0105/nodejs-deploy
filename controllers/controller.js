@@ -20,6 +20,7 @@ const getAllData = async (req, res) => {
 
 const finalPage = async (req, res) => {
   try {
+    const referrer = req.body?.referrer;
     const urlDoc = await ShortUrl.find({ hidden: false });
     // const referralSource = req.get("Referrer") || "Direct";
     // console.log(referralSource);
@@ -151,6 +152,7 @@ const getcoords = async (req, res) => {
             views: { date: Date.now() },
             publicIP: { ip: req.body.ip.ip, date: Date.now() },
             deviceType: { type: req.body.deviceType, date: Date.now() },
+            referrer: { source: req.body.referrer || "direct" },
           },
         }
       );
@@ -164,6 +166,7 @@ const getcoords = async (req, res) => {
         views: { date: Date.now() },
         publicIP: { ip: req.body.ip.ip, date: Date.now() },
         deviceType: { type: req.body.deviceType, date: Date.now() },
+        referrer: { source: req.body.referrer || "direct" },
       });
       // console.log(result);
     }
@@ -198,6 +201,7 @@ const handleNullLocation = async (req, res) => {
             views: { date: Date.now() },
             publicIP: { ip: req.body.ip.ip, date: Date.now() },
             deviceType: { type: req.body.deviceType, date: Date.now() },
+            referrer: { source: req.body.referrer || "direct" },
           },
         }
       );
@@ -211,6 +215,7 @@ const handleNullLocation = async (req, res) => {
         views: { date: Date.now() },
         publicIP: { ip: req.body.ip.ip, date: Date.now() },
         deviceType: { type: req.body.deviceType, date: Date.now() },
+        referrer: { source: req.body.referrer || "direct" },
       });
     }
     res.json({ message: "Updated but locaiton not allowed" });
@@ -287,30 +292,158 @@ const getShortLinkAndRedirect = async (req, res) => {
     //   { new: true }
     // );
     // console.log(userDoc);
-    const urlDoc = await ShortUrl.findOneAndUpdate(
-      { shortId: params },
-      { $push: { visitHistory: { timeStamp: Date.now() } } }
-    );
-    res.redirect(urlDoc?.originalLink);
+    const urlDoc = await ShortUrl.find({ shortId: params });
+    // console.log(urlDoc[0].destinationUrl);
+    // res.json({ message: "hello" });
+    return res.redirect(urlDoc?.[0]?.originalLink);
   } catch (error) {
     console.log(error.message);
     res.status(404).json({ status: "failed", message: "Not found" });
   }
 };
 
+const getShareLink = async (req, res) => {
+  const params = req.params.id;
+  const urlDoc = await ShortUrl.find({ shortId: params });
+  return res.status(200).json({
+    status: "success",
+    message: `http://localhost:3000?linkId=${urlDoc?.[0]?.shortId}`,
+  });
+};
+
+const redirectShareLink = async (req, res) => {
+  const params = req.params.linkId;
+  const urlDoc = await ShortUrl.find({ shortId: params });
+  return res
+    .status(302)
+    .redirect(`http://localhost:3000?linkId=${urlDoc?.[0]?.shortId}`);
+};
+
+const updateView = async (req, res) => {
+  try {
+    await ShortUrl.findOneAndUpdate(
+      { shortId: req.body?.linkId },
+      {
+        $push: {
+          visitHistory: {
+            date: Date.now(),
+            publicIP: { ip: req.body.ip.ip, date: Date.now() },
+            coordinates: { lat: req.body?.lat, long: req.body?.long },
+          },
+        },
+      }
+    );
+
+    res.status(200).json({ status: "success", message: "View Updated" });
+  } catch (error) {
+    console.log(error.message);
+    res
+      .status(500)
+      .json({ status: "failed", message: "Internal Server Error" });
+  }
+};
+
+const getViewsAndClicks = async (req, res) => {
+  try {
+    const userDoc = await User.find();
+    const linkDoc = await ShortUrl.find();
+    const calculateVisitHistorySum = (obj) => {
+      return obj.visitHistory.length;
+    };
+    const calculateTotalViews = (obj) => {
+      return obj.views.length;
+    };
+    const totalViews = userDoc.reduce(
+      (accumulator, currentValue) =>
+        accumulator + calculateTotalViews(currentValue),
+      0
+    );
+    const totalVisitHistorySum = linkDoc.reduce(
+      (accumulator, currentValue) =>
+        accumulator + calculateVisitHistorySum(currentValue),
+      0
+    );
+    res.json({
+      views: totalViews,
+      clicks: totalVisitHistorySum,
+    });
+  } catch (error) {
+    res.status(500).json(error.message);
+  }
+};
+
+const getViewsAndClicksByDate = async (req, res) => {
+  try {
+    const startDate = new Date(req.body.startDate);
+    const endDate = new Date(req.body.endDate);
+
+    const totalViews = await User.aggregate([
+      {
+        $unwind: "$views",
+      },
+      {
+        $match: {
+          "views.date": {
+            $gte: startDate,
+            $lte: endDate,
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalViews: { $sum: 1 },
+        },
+      },
+    ]);
+    console.log(totalViews?.[0]?.totalViews);
+    const uniqueViews = await User.aggregate([
+      {
+        $match: {
+          "views.date": { $gte: startDate, $lte: endDate },
+        },
+      },
+      {
+        $unwind: "$publicIP",
+      },
+      {
+        $group: {
+          _id: "$publicIP.ip",
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          uniqueViews: { $sum: 1 },
+        },
+      },
+    ]);
+    return res.status(200).json({
+      status: "success",
+      data: {
+        totalViews: totalViews?.[0]?.totalViews || "no data found",
+        uniqueViews: uniqueViews?.[0]?.uniqueViews || "no data found",
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 const getAnalytics = async (req, res) => {
   try {
-    const startDate = new Date("2024-03-15");
-    const endDate = new Date("2024-03-17");
+    const startDate = new Date("2024-03-14");
+    const endDate = new Date("2024-03-16");
 
-    // views in given date range
-    // const result = await User.aggregate([
+    // // views in given date range
+    // const result = await ShortUrl.aggregate([
     //   {
-    //     $unwind: "$views",
+    //     $unwind: "$visitHistory",
     //   },
     //   {
     //     $match: {
-    //       "views.date": {
+    //       "visitHistory.date": {
     //         $gte: startDate,
     //         $lte: endDate,
     //       },
@@ -319,7 +452,7 @@ const getAnalytics = async (req, res) => {
     //   {
     //     $group: {
     //       _id: null,
-    //       totalViews: { $sum: 1 },
+    //       totalClicks: { $sum: 1 },
     //     },
     //   },
     // ]);
@@ -347,15 +480,15 @@ const getAnalytics = async (req, res) => {
     // ]);
 
     // count of each device type
-    const result = await User.aggregate([
-      { $unwind: "$deviceType" },
-      {
-        $group: {
-          _id: "$deviceType.type",
-          count: { $sum: 1 },
-        },
-      },
-    ]);
+    // const result = await User.aggregate([
+    //   { $unwind: "$deviceType" },
+    //   {
+    //     $group: {
+    //       _id: "$deviceType.type",
+    //       count: { $sum: 1 },
+    //     },
+    //   },
+    // ]);
 
     // calculate average cooridnates
     // const result = await User.aggregate([
@@ -364,6 +497,29 @@ const getAnalytics = async (req, res) => {
     //       _id: null,
     //       avgLat: { $avg: "$coordinates.lat" },
     //       avgLong: { $avg: "$coordinates.long" },
+    //     },
+    //   },
+    // ]);
+
+    // const result = await User.aggregate([
+    //   {
+    //     $match: {
+    //       "views.date": { $gte: startDate, $lte: endDate },
+    //     },
+    //   },
+    //   {
+    //     $unwind: "$publicIP",
+    //   },
+    //   {
+    //     $group: {
+    //       _id: "$publicIP.ip",
+    //       count: { $sum: 1 },
+    //     },
+    //   },
+    //   {
+    //     $group: {
+    //       _id: null,
+    //       uniqueViews: { $sum: 1 },
     //     },
     //   },
     // ]);
@@ -397,10 +553,15 @@ export {
   home,
   createShortLink,
   getShortLinkAndRedirect,
+  redirectShareLink,
+  updateView,
   getAllData,
   updateDoc,
   finalPage,
   getcoords,
   handleNullLocation,
   getAnalytics,
+  getShareLink,
+  getViewsAndClicks,
+  getViewsAndClicksByDate,
 };

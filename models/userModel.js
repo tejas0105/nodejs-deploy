@@ -45,6 +45,7 @@ const userSchema = mongoose.Schema({
     lat: { type: Number, default: null },
     long: { type: Number, default: null },
   },
+  referrer: [{ source: { type: String } }],
 });
 
 const User = mongoose.model("User", userSchema);
