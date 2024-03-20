@@ -24,7 +24,7 @@ router.route("/short").post(createShortLink);
 router.route("/:id").get(getShortLinkAndRedirect);
 router.route("/api/updateView").post(updateView);
 router.route("/update/:id").patch(updateDoc);
-router.route("/api/finalpage").post(finalPage);
+router.route("/api/finalpage").get(finalPage);
 router.route("/api/getCoord").post(getcoords);
 router.route("/api/handlenulllocation").post(handleNullLocation);
 router.route("/api/getAnalytics").get(getAnalytics);
