@@ -1,8 +1,10 @@
 import ShortUrl from "../models/linkModel.js";
+import SubLink from "../models/subLinkModel.js";
 import User from "../models/userModel.js";
 import { nanoid } from "nanoid";
 import axios from "axios";
 import node_geocoder from "node-geocoder";
+import { load } from "cheerio";
 
 const home = async (req, res) => {
   res.send("<h1>This is the home route</h1>");
@@ -11,10 +13,25 @@ const home = async (req, res) => {
 const getAllData = async (req, res) => {
   try {
     const urlDoc = await ShortUrl.find();
+
     res.status(200).json({ status: "success", data: { urlDoc } });
   } catch (error) {
     console.log(error.message);
     res.status(404).json({ status: "failed", message: "Data not found" });
+  }
+};
+
+const getAllSublinkData = async (req, res) => {
+  try {
+    const subLinkDoc = await SubLink.find();
+    if (!subLinkDoc) {
+      return res.status(404).json({ status: "failed", message: "Not Found" });
+    }
+    return res.status(200).json({ status: "success", subLinkDoc });
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ status: "failed", message: "Internal server error" });
   }
 };
 
@@ -227,9 +244,14 @@ const handleNullLocation = async (req, res) => {
 const createShortLink = async (req, res) => {
   try {
     const link = req.body.originalLink;
+    const podcast = req.body.podcast;
+    const video = req.body.video;
     const regex =
       /((([A-Za-z]{3,9}:(?:\/\/)?)(?:[-;:&=\+\$,\w]+@)?[A-Za-z0-9.-]+|(?:www.|[-;:&=\+\$,\w]+@)[A-Za-z0-9.-]+)((?:\/[\+~%\/.\w-_]*)?\??(?:[-\+=&;%@.\w_]*)#?(?:[\w]*))?)/;
-    const existingLink = await ShortUrl.findOne({ originalLink: link });
+    const existingLink = await ShortUrl.findOne({
+      originalLink: link,
+    });
+
     if (existingLink) {
       return res
         .status(200)
@@ -238,20 +260,77 @@ const createShortLink = async (req, res) => {
     const validLink = regex.test(link);
     if (validLink) {
       const randomId = nanoid(10);
-      const shortLink = `http://127.0.0.1:8000/${randomId}`;
-      const videoId = link.split("?v=")[1].split("&")[0];
-      const videoData = await axios.get(
-        `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${process.env.API_KEY}`
-      );
-      const result = await ShortUrl.create({
-        shortId: randomId,
-        originalLink: link,
-        shortenLink: shortLink,
-        title: videoData?.data?.items?.[0]?.snippet?.title,
-        thumbnail:
-          videoData?.data?.items?.[0]?.snippet?.thumbnails?.maxres?.url,
-      });
-      res.status(201).json({ status: "success", data: { result } });
+      const shortLink = `http://127.0.0.1:5000/${randomId}`;
+
+      const response = await fetch(link);
+      const html = await response.text();
+      const $ = load(html);
+
+      const ogTitle = $('meta[property="og:title"]').attr("content");
+      const ogImage = $('meta[property="og:image"]').attr("content");
+
+      if (podcast) {
+        if (req.body.spotify || req.body.apple || req.body.google) {
+          try {
+            const subLinkObject = {
+              spotify: nanoid(10),
+              apple: nanoid(10),
+              google: nanoid(10),
+            };
+
+            const subLinkDoc = await SubLink.create({
+              mainLink: link,
+              id: randomId,
+              platform: {
+                spotify: {
+                  link: req.body.spotify || "",
+                  shortId: subLinkObject.spotify,
+                  shortenLink: `http://127.0.0.1:5000/spotify/${randomId}/${subLinkObject.spotify}`,
+                },
+                apple: {
+                  link: req.body.apple || "",
+                  shortId: subLinkObject.apple,
+                  shortenLink: `http://127.0.0.1:5000/apple/${randomId}/${subLinkObject.apple}`,
+                },
+                google: {
+                  link: req.body.google || "",
+                  shortId: subLinkObject.google,
+                  shortenLink: `http://127.0.0.1:5000/google/${randomId}/${subLinkObject.google}`,
+                },
+              },
+            });
+
+            const result = await ShortUrl.create({
+              shortId: randomId,
+              originalLink: link,
+              shortenLink: shortLink,
+              title: ogTitle,
+              thumbnail: ogImage,
+              type: { podcast: podcast, video: video },
+            });
+
+            return res
+              .status(201)
+              .json({ status: "success", data: { result, subLinkDoc } });
+          } catch (error) {
+            console.log(error.message);
+
+            return res
+              .status(500)
+              .json({ status: "failed", message: error.message });
+          }
+        }
+      } else {
+        const result = await ShortUrl.create({
+          shortId: randomId,
+          originalLink: link,
+          shortenLink: shortLink,
+          title: ogTitle,
+          thumbnail: ogImage,
+          type: { podcast: podcast, video: video },
+        });
+        return res.status(201).json({ status: "success", data: { result } });
+      }
     } else {
       res
         .status(400)
@@ -267,7 +346,7 @@ const createShortLink = async (req, res) => {
 
 const getShortLinkAndRedirect = async (req, res) => {
   try {
-    const params = req.params.id;
+    const shortId = req.params.id;
     // console.log("REQUEST->", req.socket.remoteAddress);
     // console.log(ip.address());
     // const ip =
@@ -292,13 +371,12 @@ const getShortLinkAndRedirect = async (req, res) => {
     //   { new: true }
     // );
     // console.log(userDoc);
-    const urlDoc = await ShortUrl.find({ shortId: params });
-    // console.log(urlDoc[0].destinationUrl);
-    // res.json({ message: "hello" });
-    return res.redirect(urlDoc?.[0]?.originalLink);
+    const url = await ShortUrl.findOne({ shortId: shortId });
+
+    return res.redirect(url?.originalLink);
   } catch (error) {
     console.log(error.message);
-    res.status(404).json({ status: "failed", message: "Not found" });
+    return res.status(404).json({ status: "failed", message: "Not found" });
   }
 };
 
@@ -307,7 +385,7 @@ const getShareLink = async (req, res) => {
   const urlDoc = await ShortUrl.find({ shortId: params });
   return res.status(200).json({
     status: "success",
-    message: `https://storied-platypus-2e4a87.netlify.app?linkId=${urlDoc?.[0]?.shortId}`,
+    message: `http://localhost:3000?linkId=${urlDoc?.[0]?.shortId}`,
   });
 };
 
@@ -316,9 +394,7 @@ const redirectShareLink = async (req, res) => {
   const urlDoc = await ShortUrl.find({ shortId: params });
   return res
     .status(302)
-    .redirect(
-      `https://storied-platypus-2e4a87.netlify.app?linkId=${urlDoc?.[0]?.shortId}`
-    );
+    .redirect(`http://localhost:3000?linkId=${urlDoc?.[0]?.shortId}`);
 };
 
 const updateView = async (req, res) => {
@@ -335,15 +411,64 @@ const updateView = async (req, res) => {
         },
       }
     );
-
-    res.status(200).json({ status: "success", message: "View Updated" });
+    return res.status(200).json({ status: "success", message: "View Updated" });
   } catch (error) {
     console.log(error.message);
-    res
+    return res
       .status(500)
       .json({ status: "failed", message: "Internal Server Error" });
   }
 };
+
+const redirectPodcastLink = async (req, res) => {
+  const platform = req.params.platform;
+  const subLinkDoc = await SubLink.findOne({ id: req.params.id1 });
+  const platformData = subLinkDoc?.platform[platform];
+  const visitData = {
+    date: new Date(),
+  };
+  const query = {};
+  query[`platform.${platform}.shortId`] = platformData?.shortId;
+
+  await SubLink.findOneAndUpdate(
+    query,
+    {
+      $push: {
+        [`platform.${platform}.visitHistory`]: visitData,
+      },
+    },
+    { new: true }
+  );
+  // console.log(updateClicks);
+  return res.redirect(platformData?.link);
+};
+
+// const updateViewSublink = async (req, res) => {
+//   try {
+//     const visitData = {
+//       date: new Date(),
+//       publicIP: [{ ip: "192.168.1.1", date: new Date() }],
+//       coordinates: { lat: 40.7128, long: -74.006 },
+//     };
+//     const query = {};
+//     query[`platform.${platform}.shortId`] = platformData?.shortId;
+//     await SubLink.findOneAndUpdate(
+//       query,
+//       {
+//         $push: {
+//           [`platform.${platform}.visitHistory`]: visitData,
+//         },
+//       },
+//       { new: true }
+//     );
+//     return res.status(200).json({ status: "success", message: "View Updated" });
+//   } catch (error) {
+//     console.log(error.message);
+//     return res
+//       .status(500)
+//       .json({ status: "failed", message: "Internal Server Error" });
+//   }
+// };
 
 const getViewsAndClicks = async (req, res) => {
   try {
@@ -526,6 +651,12 @@ const getAnalytics = async (req, res) => {
     //   },
     // ]);
 
+    const result = await User.aggregate([
+      { $unwind: "$referrer" },
+      { $match: { "referrer.source": "direct" } },
+      { $group: { _id: null, count: { $sum: 1 } } },
+    ]);
+
     res.json(result);
   } catch (error) {
     console.error(error);
@@ -536,10 +667,8 @@ const getAnalytics = async (req, res) => {
 const updateDoc = async (req, res) => {
   try {
     const id = req.params.id;
-    console.log(id);
     const setHidden = req.body.setHidden;
-    console.log(req.body);
-    const urlDoc = await ShortUrl.findOneAndUpdate(
+    await ShortUrl.findOneAndUpdate(
       { shortId: id },
       { $set: { hidden: setHidden } }
     );
@@ -566,4 +695,6 @@ export {
   getShareLink,
   getViewsAndClicks,
   getViewsAndClicksByDate,
+  redirectPodcastLink,
+  getAllSublinkData,
 };

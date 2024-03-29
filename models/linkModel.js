@@ -1,38 +1,32 @@
 import mongoose from "mongoose";
 
-const userDataSchema = new mongoose.Schema({
-  ipAddress: { type: String, default: "127.0.0.1" },
-  pincode: Number,
-  geolocation: {
-    type: { type: String, default: "Point" },
-    coordinates: [{ lat: { type: Number }, long: { type: Number } }],
-  },
-  clicks: {
-    type: Number,
-    default: 0,
-  },
-});
-
 const urlSchema = new mongoose.Schema(
   {
     shortId: {
       type: String,
       required: true,
     },
-    originalLink: {
-      type: String,
-      required: ["true", "please provide original link"],
-    },
+
+    originalLink: { type: String, required: true },
+
     shortenLink: {
       type: String,
       required: ["true", "please provide original link"],
     },
+
     title: {
       type: String,
     },
+
     thumbnail: {
       type: String,
     },
+
+    type: {
+      podcast: Boolean,
+      video: Boolean,
+    },
+
     visitHistory: [
       {
         date: { type: Date },
@@ -45,6 +39,7 @@ const urlSchema = new mongoose.Schema(
         coordinates: { lat: { type: Number }, long: { type: Number } },
       },
     ],
+
     hidden: {
       type: Boolean,
       default: false,

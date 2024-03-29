@@ -14,14 +14,18 @@ import {
   getAnalytics,
   getViewsAndClicks,
   getViewsAndClicksByDate,
+  redirectPodcastLink,
+  getAllSublinkData,
 } from "../controllers/controller.js";
 
 const router = express.Router();
 
 router.route("/").get(home);
 router.route("/getalldata").get(getAllData);
+router.route("/getallsublinkdata").get(getAllSublinkData);
 router.route("/short").post(createShortLink);
 router.route("/:id").get(getShortLinkAndRedirect);
+router.route("/:platform/:id1/:id2").get(redirectPodcastLink);
 router.route("/api/updateView").post(updateView);
 router.route("/update/:id").patch(updateDoc);
 router.route("/api/finalpage").get(finalPage);
